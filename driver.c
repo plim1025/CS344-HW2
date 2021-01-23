@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <time.h>
 
 // Returns pointer to file based on option
 char *getFile() {
@@ -23,13 +24,18 @@ char *getFile() {
         if(choice2 == 1) {
             DIR *dir;
             struct dirent *dp;
-            long long maxFileSize = 0;
+            long long maxFileSize = -1;
             dir = opendir(".");
+            // Loop over all files in directory
             while ((dp=readdir(dir)) != NULL) {
                 FILE *fp = fopen(dp->d_name, "r");
-                fseek(fp, 0, SEEK_END);
-                long long size = ftell(fp);
-                fclose(fp);
+                long long size = 0;
+                // If file isn't directory, get size of file
+                if(fp != NULL) {
+                    fseek(fp, 0, SEEK_END);
+                    size = ftell(fp);
+                    fclose(fp);
+                }
                 // File must have 'movies_' prefix and be of type csv
                 if(strlen(dp->d_name) > 10 && strstr(dp->d_name, "movies_") && (strstr(dp->d_name, ".csv") || strstr(dp->d_name, ".CSV")) && size > maxFileSize) {
                     fileName = malloc(strlen(dp->d_name) * sizeof(char));
@@ -40,8 +46,9 @@ char *getFile() {
             // No file matching conditions found, print error
             if(fileName == NULL) {
                 printf("%s", "No .csv files that start with the prefix movies_ in the current directory ");
+            } else {
+                return fileName;
             }
-            break;
         }
         // Find the smallest .csv file starting with prefix movies_
         else if (choice2 == 2) {
@@ -49,11 +56,16 @@ char *getFile() {
             struct dirent *dp;
             long long minFileSize = 9223372036854775807;
             dir = opendir(".");
+            // Loop over all files in directory
             while ((dp=readdir(dir)) != NULL) {
                 FILE *fp = fopen(dp->d_name, "r");
-                fseek(fp, 0, SEEK_END);
-                long long size = ftell(fp);
-                fclose(fp);
+                long long size = 0;
+                // If file isn't directory, get size of file
+                if(fp != NULL) {
+                    fseek(fp, 0, SEEK_END);
+                    size = ftell(fp);
+                    fclose(fp);
+                }
                 // File must have 'movies_' prefix and be of type csv
                 if(strlen(dp->d_name) > 10 && strstr(dp->d_name, "movies_") && (strstr(dp->d_name, ".csv") || strstr(dp->d_name, ".CSV")) && size < minFileSize) {
                     fileName = malloc(strlen(dp->d_name) * sizeof(char));
@@ -64,8 +76,9 @@ char *getFile() {
             // No file matching conditions found, print error
             if(fileName == NULL) {
                 printf("%s", "No .csv files that start with the prefix movies_ in the current directory ");
+            } else {
+                return fileName;
             }
-            break;
         }
         // Ask the user to enter a file name and handle error if doesn't exist
         else {
@@ -76,6 +89,7 @@ char *getFile() {
             struct dirent *dp;
             int fileExists = 0;
             dir = opendir(".");
+            // Loop over all files in directory and check if given fileName exists
             while ((dp=readdir(dir)) != NULL) {
                 if(strcmp(dp->d_name, tempFileName) == 0) {
                     fileExists = 1;
@@ -83,17 +97,79 @@ char *getFile() {
             }
             // No file matching conditions found, print error
             if(fileExists) {
-                fileName = tempFileName;
-                break;
+                fileName = malloc(strlen(tempFileName) * sizeof(char));
+                strcpy(fileName, tempFileName);
+                return fileName;
             } else {
                 printf("%s %s %s", "The file", tempFileName, " was not found. Try again\n");
             }
         }
     }
-    return fileName;
+}
+
+// Create new directory with permissions set to rwxr-x---
+char *createDirectory() {
+    int randNum = rand() % 100000;
+    char prefix[13] = {'l', 'i', 'm', 'p', '.', 'm', 'o', 'v', 'i', 'e', 's', '.', '\0'};
+    char suffix[6];
+    
+    // Gets user input from user
+    sprintf(suffix, "%d", randNum);
+    char *pathName = malloc(strlen(prefix) + strlen(suffix) + 1);
+    strcpy(pathName, prefix);
+    strcat(pathName, suffix);
+    mkdir(pathName, 0750);
+    chmod(pathName, 0750);
+    return pathName;
+}
+
+void processFile(char *fileName, char *directoryName) {
+    FILE *readFile = fopen(fileName, "r");
+    // Print error if can't open file
+    if(readFile == NULL) {
+        printf("Could not open %s\n", fileName);
+        exit(1);
+    }
+
+    char *curLine = NULL;
+    char *savePtr;
+    size_t len = 0;
+    ssize_t nread;
+
+    // Skip first line
+    getline(&curLine, &len, readFile);
+
+    // Parses file line-by-line
+    while((nread = getline(&curLine, &len, readFile)) != -1) {
+        // Assign current movie title
+        char *token = strtok_r(curLine, ",", &savePtr);
+        char *title = calloc(strlen(token) + 1, sizeof(char));
+        strcpy(title, token);
+
+        // Assign current movie year
+        token = strtok_r(NULL, ",", &savePtr);
+        char *year = calloc(strlen(token) + 1, sizeof(char));
+        strcpy(year, token);
+
+        // Get write file path
+        char writeFileName[27];
+        strcpy(writeFileName, directoryName);
+        strcat(writeFileName, "/");
+        strcat(writeFileName, year);
+        strcat(writeFileName, ".txt");
+
+        // Write to file
+        FILE *writeFile = fopen(writeFileName, "a");
+        chmod(writeFileName, 0640);
+        fprintf(writeFile, "%s\n", title);
+        fclose(writeFile);
+    }
+    // Close file
+    fclose(readFile);
 }
 
 int main(int argc, char **argv) {
+    srand(time(NULL));
     int choice1 = 1;
     while(1) {
         // Gets user input and handles errors
@@ -111,21 +187,13 @@ int main(int argc, char **argv) {
 
         // Gets name of file to parse
         char *fileName = getFile();
-        printf("%s %s\n", "Now processing the chosen file named", fileName);
+        printf("%s %s", "Now processing the chosen file named", fileName);
 
-        // Create new directory with permissions set to rwxr-x---
-        int randNum = rand() % 100000;
-        char prefix[13] = {'l', 'i', 'm', 'p', '.', 'm', 'o', 'v', 'i', 'e', 's', '.', '\0'};
-        char suffix[6];
-        sprintf(suffix, "%d", randNum);
-        char *pathName = malloc(strlen(prefix) + strlen(suffix) + 1);
-        strcpy(pathName, prefix);
-        strcpy(pathName, suffix);
-        mkdir(pathName, 0700);
+        // Create directory and return directory name
+        char *directoryName = createDirectory();
 
-        // For each year with at least one movie in file create file with permissions set to rw-r-----
-
-        // Write in file name of movies that aired in that year
+        // For each year with at least one movie in file create file with permissions set to rw-r----- and append movie titles in that year
+        processFile(fileName, directoryName);
     }
     return 0;
 }
