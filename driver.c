@@ -8,11 +8,11 @@
 #include <unistd.h>
 #include <time.h>
 
-// Returns pointer to file based on option
+// Gets file name to process based on user input
 char *getFile() {
     char *fileName = NULL;
     while(1) {
-        // Gets user input and handles errors
+        // Gets user option and handles bad input
         int choice2 = ' ';
         printf("%s", "\nWhich file do you want to process?\nEnter 1 to pick the largest file\nEnter 2 to pick the smallest file\nEnter 3 to specify the name of a file\n\nEnter a choice from 1 to 3: ");
         scanf("%d", &choice2);
@@ -30,20 +30,20 @@ char *getFile() {
             while ((dp=readdir(dir)) != NULL) {
                 FILE *fp = fopen(dp->d_name, "r");
                 long long size = 0;
-                // If file isn't directory, get size of file
+                // If file isn't a directory, get size of file
                 if(fp != NULL) {
                     fseek(fp, 0, SEEK_END);
                     size = ftell(fp);
                     fclose(fp);
                 }
-                // File must have 'movies_' prefix and be of type csv
+                // File must have 'movies_' prefix, be of type csv, and have greater size than previous files to overwrite
                 if(strlen(dp->d_name) > 10 && strstr(dp->d_name, "movies_") && (strstr(dp->d_name, ".csv") || strstr(dp->d_name, ".CSV")) && size > maxFileSize) {
                     fileName = malloc(strlen(dp->d_name) * sizeof(char));
                     strcpy(fileName, dp->d_name);
                     maxFileSize = size;
                 }
             }
-            // No file matching conditions found, print error
+            // If no file matching conditions found, print error, otherwise return file name
             if(fileName == NULL) {
                 printf("%s", "No .csv files that start with the prefix movies_ in the current directory ");
             } else {
@@ -60,20 +60,20 @@ char *getFile() {
             while ((dp=readdir(dir)) != NULL) {
                 FILE *fp = fopen(dp->d_name, "r");
                 long long size = 0;
-                // If file isn't directory, get size of file
+                // If file isn't a directory, get size of file
                 if(fp != NULL) {
                     fseek(fp, 0, SEEK_END);
                     size = ftell(fp);
                     fclose(fp);
                 }
-                // File must have 'movies_' prefix and be of type csv
+                // File must have 'movies_' prefix, be of type csv, and have smaller size than previous files to overwrite
                 if(strlen(dp->d_name) > 10 && strstr(dp->d_name, "movies_") && (strstr(dp->d_name, ".csv") || strstr(dp->d_name, ".CSV")) && size < minFileSize) {
                     fileName = malloc(strlen(dp->d_name) * sizeof(char));
                     strcpy(fileName, dp->d_name);
                     minFileSize = size;
                 }
             }
-            // No file matching conditions found, print error
+            // If no file matching conditions found, print error, otherwise return file name
             if(fileName == NULL) {
                 printf("%s", "No .csv files that start with the prefix movies_ in the current directory ");
             } else {
@@ -95,7 +95,7 @@ char *getFile() {
                     fileExists = 1;
                 }
             }
-            // No file matching conditions found, print error
+            // If no file matching conditions found, print error, otherwise return file name
             if(fileExists) {
                 fileName = malloc(strlen(tempFileName) * sizeof(char));
                 strcpy(fileName, tempFileName);
@@ -107,19 +107,20 @@ char *getFile() {
     }
 }
 
-// Create new directory with permissions set to rwxr-x---
+// Create new directory and set permissions
 char *createDirectory() {
     int randNum = rand() % 100000;
     char prefix[13] = {'l', 'i', 'm', 'p', '.', 'm', 'o', 'v', 'i', 'e', 's', '.', '\0'};
     char suffix[6];
-    
-    // Gets user input from user
+
+    // Make directory based on ONID and random number
     sprintf(suffix, "%d", randNum);
     char *pathName = malloc(strlen(prefix) + strlen(suffix) + 1);
     strcpy(pathName, prefix);
     strcat(pathName, suffix);
     mkdir(pathName, 0750);
     chmod(pathName, 0750);
+    printf("%s %s", "\nCreated directory with name", pathName);
     return pathName;
 }
 
@@ -158,7 +159,7 @@ void processFile(char *fileName, char *directoryName) {
         strcat(writeFileName, year);
         strcat(writeFileName, ".txt");
 
-        // Write to file
+        // Append to file and set permissions of file
         FILE *writeFile = fopen(writeFileName, "a");
         chmod(writeFileName, 0640);
         fprintf(writeFile, "%s\n", title);
